@@ -1,0 +1,18 @@
+# Ignore env file
+.env
+
+# Ignore local python virtual environment
+venv/
+
+# Ignores serialized objects and models
+*.pkl
+*.h5
+
+# Ignores raw image data
+flickr8k/images/*
+
+# Ignore other defined files
+.idea/
+__pycache__/
+**__pycache__/
+modules/__pycache__/
