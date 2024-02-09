@@ -1,8 +1,9 @@
 import os
-from flask import Flask, render_template, request, abort, redirect, url_for
+from flask import Flask, render_template, request, abort, redirect, url_for, flash
 from flask_wtf import FlaskForm
-from wtforms import SubmitField, SelectField, FileField, TextAreaField
-from wtforms.validators import InputRequired
+from flask_wtf.file import FileRequired, FileAllowed, FileField
+from wtforms import SubmitField, SelectField, TextAreaField
+from wtforms.validators import InputRequired, ValidationError
 from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
 
@@ -15,28 +16,49 @@ app = Flask(__name__)
 load_dotenv()
 # Sets secret key for form validation (CSRF)
 app.config["SECRET_KEY"] = os.getenv("SECRET_KEY")
-uploads_directory = "static/uploads"
+app.config["UPLOAD_DIRECTORY"] = "static/uploads"
+app.config["MAX_UPLOAD_SIZE"] = 1048576  # 2 MB
 
 
+# Validates file upload type and size
+def validate_file_upload(file_field):
+    if not file_field.data:
+        return " File is invalid."
+    elif not file_field.data.content_type.startswith("image"):
+        return " Invalid file type (must be an image)."
+
+    file_size = len(file_field.data.read())
+    file_field.data.seek(0)  # Since validation read the file, reset the head
+
+    if file_size > app.config["MAX_UPLOAD_SIZE"]:
+        return f" File exceeds maximum size ({app.config['MAX_UPLOAD_SIZE']} bytes)."
+    return None
+
+# Main page form
 class MainForm(FlaskForm):
-    select_file = FileField("File", validators=[InputRequired()])
+    select_file = FileField("File", validators=[FileRequired()])
     text_field = TextAreaField("Creative Tuning")
     submit = SubmitField("Generate Caption")
 
-#STYLESHEET: <link rel="stylesheet" href="{{ url_for('static', filename='css/page.css') }}">
+
+
 # Main Webpage
 # Contains basic information about the project
 @app.route("/", methods=["GET", "POST"])
 def home():
     form = MainForm()
     if form.validate_on_submit():
-        file = form.select_file.data
+        # Ensure valid uploaded file
+        validation = validate_file_upload(form.select_file)
+        if validation:
+            return render_template("home.html", form=form, flash_message=validation)
+
         context = form.text_field.data
-        filename = secure_filename(file.filename)
-        file.save(uploads_directory + filename)
+        filename = secure_filename(form.select_file.data.filename)
+        form.select_file.data.save(os.path.join(app.config["UPLOAD_DIRECTORY"], filename))
 
         return "File has been uploaded."
-    return render_template("home.html", form=form)
+    return render_template("home.html", form=form, flash_message=None)
 
 
 # Handles 404 error and returns a page html

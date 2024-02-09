@@ -2,8 +2,14 @@
 
 {% block content %}
 
+{% if flash_message %}
+    <div class="alert alert-warning" role="alert">
+      <strong>Error!</strong> {{flash_message}}
+    </div>
+{% endif %}
+
 <div class="text-center">
-    <h1 class="mb-4">Caption Crafter</h1>
+    <h1 class="mb-4"><strong>Caption Crafter</strong></h1>
     <h3 class="mb-4">Name: Erik Nguyen</h3>
     <h3 class="mb-4">Instructor: Professor Lidia Morrison</h3>
 </div>
@@ -12,13 +18,14 @@
 
 <form method='POST' enctype='multipart/form-data'>
     <div class="form-group">
+        {{form.csrf_token}}
         {{form.hidden_tag()}}
         {{form.select_file(class="form-control")}}
     </div>
 
     <div class="form-group">
         {{form.text_field.label}}
-        {{form.text_field(class_="form-control", size=32, rows=5)}}
+        {{form.text_field(class_="form-control", size=32, rows=5, maxlength=512)}}
         <small class="form-text text-muted">*Optional</small>
     </div>
 
