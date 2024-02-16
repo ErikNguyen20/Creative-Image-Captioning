@@ -174,75 +174,28 @@ class ImageCaptionModel:
         self.model_file_path = model_file_path
         self.is_loaded = False
 
-        # recurrent_units = 640
-        # text_embedding_size = 320
-        #
-        # image_input_layer = tf.keras.layers.Input(shape=(image_encoder.output_size,), name="Image Features Input")
-        # linear_transformation = tf.keras.layers.Dense(recurrent_units, activation="tanh")(image_input_layer)
-        #
-        # # text_input_layer = tf.keras.layers.Input(shape=(None,), name="Text Tokens Input")
-        # text_input_layer = tf.keras.layers.Input(shape=(text_transformer.max_sequence_length - 1,),
-        #                                          name="Text Tokens Input")
-        # text_embedding_layer = tf.keras.layers.Embedding(input_dim=text_transformer.vocab_size,
-        #                                                  output_dim=text_embedding_size)(text_input_layer)
-        #
-        # sequential_layer1 = tf.keras.layers.GRU(units=recurrent_units, return_sequences=True)(text_embedding_layer,
-        #                                                                                 initial_state=linear_transformation)
-        # sequential_layer2 = tf.keras.layers.GRU(units=recurrent_units, return_sequences=True)(sequential_layer1,
-        #                                                                                 initial_state=linear_transformation)
-        # sequential_layer3 = tf.keras.layers.GRU(units=recurrent_units, return_sequences=False)(sequential_layer2,
-        #                                                                                 initial_state=linear_transformation)
-        # dropout = tf.keras.layers.Dropout(0.2)(sequential_layer3)
-        # output_layer = tf.keras.layers.Dense(text_transformer.vocab_size, activation="softmax")(dropout)
-        #
-        # self.caption_model = tf.keras.models.Model(inputs=[image_input_layer, text_input_layer], outputs=output_layer)
-        # self.caption_model.compile(optimizer="adam", loss="categorical_crossentropy")
-
-        # recurrent_units = 640
-        # text_embedding_size = 320
-        #
-        # image_input_layer = tf.keras.layers.Input(shape=(image_encoder.output_size,), name="Image Features Input")
-        # linear_transformation = tf.keras.layers.Dense(recurrent_units, activation="tanh")(image_input_layer)
-        #
-        # # text_input_layer = tf.keras.layers.Input(shape=(None,), name="Text Tokens Input")
-        # text_input_layer = tf.keras.layers.Input(shape=(text_transformer.max_sequence_length - 1,),
-        #                                          name="Text Tokens Input")
-        # text_embedding_layer = tf.keras.layers.Embedding(input_dim=text_transformer.vocab_size,
-        #                                                  output_dim=text_embedding_size)(text_input_layer)
-        #
-        # sequential_layer1 = tf.keras.layers.GRU(units=recurrent_units, return_sequences=True)(text_embedding_layer,
-        #                                                                                 initial_state=linear_transformation)
-        # sequential_layer2 = tf.keras.layers.GRU(units=recurrent_units, return_sequences=True)(sequential_layer1,
-        #                                                                                 initial_state=linear_transformation)
-        # sequential_layer3 = tf.keras.layers.GRU(units=recurrent_units, return_sequences=True)(sequential_layer2,
-        #                                                                                 initial_state=linear_transformation)
-        # dropout = tf.keras.layers.Dropout(0.2)(sequential_layer3)
-        # output_layer = tf.keras.layers.Dense(text_transformer.vocab_size, activation="softmax")(dropout)
-        #
-        # self.caption_model = tf.keras.models.Model(inputs=[image_input_layer, text_input_layer], outputs=output_layer)
-        # self.caption_model.compile(optimizer="adam", loss="categorical_crossentropy")
-
-        # LSTM_size = 512
+        # LSTM_size = 256
         # text_embedding_size = 256
         #
         # image_input_layer = tf.keras.layers.Input(shape=(image_encoder.output_size,), name="Image Features Input")
         # pass_through = tf.keras.layers.Dense(LSTM_size, activation="tanh")(image_input_layer)
+        # pass_through = tf.keras.layers.Dropout(0.2)(pass_through)
         # pass_in = tf.keras.layers.Dense(text_embedding_size, activation="tanh")(image_input_layer)
+        # pass_in = tf.keras.layers.Dropout(0.2)(pass_in)
         # pass_in = tf.keras.layers.Reshape(target_shape=(1, text_embedding_size))(pass_in)
         #
         # text_input_layer = tf.keras.layers.Input(shape=(text_transformer.max_sequence_length - 1,),
         #                                          name="Text Tokens Input")
         # text_embedding_layer = tf.keras.layers.Embedding(input_dim=text_transformer.vocab_size,
         #                                                  output_dim=text_embedding_size)(text_input_layer)
+        # text_embedding_layer = tf.keras.layers.Dropout(0.2)(text_embedding_layer)
         #
         # x = tf.keras.layers.Concatenate(axis=1)([pass_in, text_embedding_layer])
         # x = tf.keras.layers.LSTM(units=LSTM_size, return_sequences=True)(x)
         # x = tf.keras.layers.Add()([x, pass_through])
-        # x = tf.keras.layers.Dense(LSTM_size, activation="swish")(x)
-        # x = tf.keras.layers.Dropout(0.2)(x)
         # x = tf.keras.layers.LSTM(units=LSTM_size, return_sequences=False)(x)
         # x = tf.keras.layers.Add()([x, pass_through])
-        # x = tf.keras.layers.Dense(LSTM_size*2, activation="swish")(x)
+        # x = tf.keras.layers.Dense(LSTM_size, activation="relu")(x)
         # x = tf.keras.layers.Dropout(0.2)(x)
         # output_layer = tf.keras.layers.Dense(text_transformer.vocab_size, activation="softmax")(x)
         #
@@ -251,28 +204,28 @@ class ImageCaptionModel:
 
         LSTM_size = 256
         text_embedding_size = 256
+        image_embedding_size = 512
 
         image_input_layer = tf.keras.layers.Input(shape=(image_encoder.output_size,), name="Image Features Input")
-        pass_through = tf.keras.layers.Dense(LSTM_size, activation="tanh")(image_input_layer)
-        pass_through = tf.keras.layers.Dropout(0.2)(pass_through)
-        pass_in = tf.keras.layers.Dense(text_embedding_size, activation="tanh")(image_input_layer)
-        pass_in = tf.keras.layers.Dropout(0.2)(pass_in)
-        pass_in = tf.keras.layers.Reshape(target_shape=(1, text_embedding_size))(pass_in)
+        image_pass_in = tf.keras.layers.Dense(image_embedding_size, activation="swish")(image_input_layer)
+        image_pass_in = tf.keras.layers.Dropout(0.0)(image_pass_in)
+        # image_pass_in = tf.keras.layers.Reshape(target_shape=(1, image_embedding_size))(image_pass_in)
 
-        text_input_layer = tf.keras.layers.Input(shape=(text_transformer.max_sequence_length - 1,),
-                                                 name="Text Tokens Input")
-        text_embedding_layer = tf.keras.layers.Embedding(input_dim=text_transformer.vocab_size,
-                                                         output_dim=text_embedding_size)(text_input_layer)
-        text_embedding_layer = tf.keras.layers.Dropout(0.2)(text_embedding_layer)
+        text_input_layer = tf.keras.layers.Input(shape=(text_transformer.max_sequence_length - 1,), name="Text Tokens Input")
+        text_embedding_layer = tf.keras.layers.Embedding(input_dim=text_transformer.vocab_size, output_dim=text_embedding_size)(text_input_layer)
+        text_embedding_layer = tf.keras.layers.Dropout(0.4)(text_embedding_layer)
+        text_embedding_forward = tf.keras.layers.LSTM(units=LSTM_size, return_sequences=False)(text_embedding_layer)
+        text_embedding_backward = tf.keras.layers.LSTM(units=LSTM_size, return_sequences=False, go_backwards=True)(text_embedding_layer)
+        text_embedding_layer = tf.keras.layers.Concatenate(axis=-1)([text_embedding_forward, text_embedding_backward])
+        text_embedding_layer = tf.keras.layers.Dense(image_embedding_size, activation="swish")(text_embedding_layer)
+        # text_embedding_layer = tf.keras.layers.Reshape(target_shape=(1, image_embedding_size))(text_embedding_layer)
 
-        x = tf.keras.layers.Concatenate(axis=1)([pass_in, text_embedding_layer])
-        x = tf.keras.layers.LSTM(units=LSTM_size, return_sequences=True)(x)
-        x = tf.keras.layers.Add()([x, pass_through])
-        x = tf.keras.layers.LSTM(units=LSTM_size, return_sequences=False)(x)
-        x = tf.keras.layers.Add()([x, pass_through])
-        x = tf.keras.layers.Dense(LSTM_size, activation="relu")(x)
-        x = tf.keras.layers.Dropout(0.2)(x)
-        output_layer = tf.keras.layers.Dense(text_transformer.vocab_size, activation="softmax")(x)
+        # attention = tf.keras.layers.Attention()([text_embedding_layer, image_pass_in])
+        # combined = tf.keras.layers.Add()([text_embedding_layer, image_pass_in])
+        combined = tf.keras.layers.Concatenate(axis=-1)([text_embedding_layer, image_pass_in])
+        combined = tf.keras.layers.Dense(image_embedding_size * 4, activation="swish")(combined)
+        output_layer = tf.keras.layers.Dense(text_transformer.vocab_size, activation="softmax")(combined)
+        # output_layer = tf.keras.layers.Reshape(target_shape=(text_transformer.vocab_size, ))(output_layer)
 
         self.caption_model = tf.keras.models.Model(inputs=[image_input_layer, text_input_layer], outputs=output_layer)
         self.caption_model.compile(optimizer="adam", loss="categorical_crossentropy")
@@ -295,7 +248,8 @@ class ImageCaptionModel:
         plt.ylabel('loss')
         plt.xlabel('epoch')
         plt.legend(['train', 'val'], loc='upper left')
-        plt.show()
+        plt.imsave("loss_plot.png")
+        # plt.show()
 
     def load(self):
         if self.is_loaded:

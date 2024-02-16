@@ -8,6 +8,9 @@ from utils import TextTransformer, ImageEncoder, ImageCaptionSequence, ImageCapt
 # https://www.kaggle.com/code/ghazouanihaythem/image-captioninng-using-cnn-and-lstm
 # https://github.com/Hvass-Labs/TensorFlow-Tutorials/blob/master/22_Image_Captioning.ipynb
 
+# https://medium.com/swlh/image-captioning-using-attention-mechanism-f3d7fc96eb0e
+# https://github.com/ElisonSherton/Image_Captioning/blob/master/Keras_Greedy__Image_Captioning.ipynb
+
 
 # Import captions dataset
 captions_df = pd.read_csv("flickr8k/captions.txt")
@@ -19,7 +22,7 @@ captions_df["caption"] = captions_df["caption"].apply(lambda caption: re.sub(r"[
 captions_df["caption"] = captions_df["caption"].apply(lambda caption: re.sub(r"\b\w\b", "", caption))
 captions_df["caption"] = captions_df["caption"].apply(lambda caption: "[STR] " + caption + " [END]")
 captions_df["caption"] = captions_df["caption"].apply(lambda caption: re.sub(r"\s+", " ", caption))
-print(captions_df.head(10))
+# print(captions_df.head(10))
 
 
 # Tokenize Captions
@@ -41,7 +44,7 @@ caption_generator = ImageCaptionModel(image_encoder, text_transformer)
 caption_generator.summary()
 
 # Training
-train_split = 0.70
+train_split = 0.80
 rng = random.Random(42)
 image_references = captions_df["image"].unique().tolist()
 rng.shuffle(image_references)
@@ -52,11 +55,11 @@ test_captions = captions_df[captions_df["image"].isin(test_images)].groupby('ima
 
 train_loader = ImageCaptionSequence(train_captions, 64, image_encoder, text_transformer, cache="train_loader.pkl")
 test_loader = ImageCaptionSequence(test_captions, 64, image_encoder, text_transformer, cache="test_loader.pkl")
-#
-# caption_generator.train(train_loader, test_loader, 100)
+
+caption_generator.train(train_loader, test_loader, 100)
 
 # Testing
-caption_generator.load()
+# caption_generator.load()
 result = caption_generator.predict("flickr8k/images/17273391_55cfc7d3d4.jpg")
 print(result)
 result = caption_generator.predict("flickr8k/images/19212715_20476497a3.jpg")

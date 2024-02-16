@@ -7,6 +7,9 @@ from wtforms.validators import InputRequired, ValidationError
 from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
 
+# Example loading
+# https://github.com/devtonic-net/flask-loading-app-message-and-spinner/blob/main/main.py
+
 
 # Instantiates Flask Application
 # Run the app by typing 'flask run' in the virtual environment terminal
@@ -16,6 +19,12 @@ app = Flask(__name__)
 load_dotenv()
 # Sets secret key for form validation (CSRF)
 app.config["SECRET_KEY"] = os.getenv("SECRET_KEY")
+
+# Configures file upload configurations
+if not os.path.exists("static"):
+    os.mkdir("static")
+elif not os.path.exists(os.path.join("static", "uploads")):
+    os.mkdir(os.path.join("static", "uploads"))
 app.config["UPLOAD_DIRECTORY"] = "static/uploads"
 app.config["MAX_UPLOAD_SIZE"] = 1048576  # 2 MB
 
