@@ -15,12 +15,12 @@ class ImageEncoder:
         self.image_directory = image_directory
 
         self.interpolation = "bicubic"
-        self.pretrained_model = tf.keras.applications.EfficientNetV2B3(weights="imagenet")
+        self.pretrained_model = tf.keras.applications.Xception(weights="imagenet")
+        self.pretrained_model.summary()
         self.image_size = tf.keras.backend.int_shape(self.pretrained_model.input)[1:3]
-        # Alternative output layer: avg_pool (GlobalAveragePooling2D)
         self.encoding_model = tf.keras.models.Model(inputs=self.pretrained_model.input,
-                                                    outputs=self.pretrained_model.get_layer("top_dropout").output)
-        self.output_size = tf.keras.backend.int_shape(self.pretrained_model.get_layer("top_dropout").output)[1]
+                                                    outputs=self.pretrained_model.layers[-2].output)
+        self.output_size = tf.keras.backend.int_shape(self.pretrained_model.layers[-2].output)[1]
 
     def __call__(self, image_path: str, from_directory: bool = True):
         if self.image_directory and from_directory:
@@ -174,61 +174,39 @@ class ImageCaptionModel:
         self.model_file_path = model_file_path
         self.is_loaded = False
 
-        # LSTM_size = 256
-        # text_embedding_size = 256
-        #
-        # image_input_layer = tf.keras.layers.Input(shape=(image_encoder.output_size,), name="Image Features Input")
-        # pass_through = tf.keras.layers.Dense(LSTM_size, activation="tanh")(image_input_layer)
-        # pass_through = tf.keras.layers.Dropout(0.2)(pass_through)
-        # pass_in = tf.keras.layers.Dense(text_embedding_size, activation="tanh")(image_input_layer)
-        # pass_in = tf.keras.layers.Dropout(0.2)(pass_in)
-        # pass_in = tf.keras.layers.Reshape(target_shape=(1, text_embedding_size))(pass_in)
-        #
-        # text_input_layer = tf.keras.layers.Input(shape=(text_transformer.max_sequence_length - 1,),
-        #                                          name="Text Tokens Input")
-        # text_embedding_layer = tf.keras.layers.Embedding(input_dim=text_transformer.vocab_size,
-        #                                                  output_dim=text_embedding_size)(text_input_layer)
-        # text_embedding_layer = tf.keras.layers.Dropout(0.2)(text_embedding_layer)
-        #
-        # x = tf.keras.layers.Concatenate(axis=1)([pass_in, text_embedding_layer])
-        # x = tf.keras.layers.LSTM(units=LSTM_size, return_sequences=True)(x)
-        # x = tf.keras.layers.Add()([x, pass_through])
-        # x = tf.keras.layers.LSTM(units=LSTM_size, return_sequences=False)(x)
-        # x = tf.keras.layers.Add()([x, pass_through])
-        # x = tf.keras.layers.Dense(LSTM_size, activation="relu")(x)
-        # x = tf.keras.layers.Dropout(0.2)(x)
-        # output_layer = tf.keras.layers.Dense(text_transformer.vocab_size, activation="softmax")(x)
-        #
-        # self.caption_model = tf.keras.models.Model(inputs=[image_input_layer, text_input_layer], outputs=output_layer)
-        # self.caption_model.compile(optimizer="adam", loss="categorical_crossentropy")
-
-        LSTM_size = 256
+        # for dropout 0.4 and 2 additional dense layers at end (large_bilstm)
+        # BLEU 1 - gram: 0.4534395718022018
+        # BLEU 2 - gram: 0.2647884037811029
+        # BLEU 3 - gram: 0.17946029058000412
+        # BLEU 4 - gram: 0.08316229210719871
+        LSTM_size = 512
         text_embedding_size = 256
-        image_embedding_size = 512
 
         image_input_layer = tf.keras.layers.Input(shape=(image_encoder.output_size,), name="Image Features Input")
-        image_pass_in = tf.keras.layers.Dense(image_embedding_size, activation="swish")(image_input_layer)
-        image_pass_in = tf.keras.layers.Dropout(0.0)(image_pass_in)
-        # image_pass_in = tf.keras.layers.Reshape(target_shape=(1, image_embedding_size))(image_pass_in)
+        pass_in = tf.keras.layers.Dropout(0.4)(image_input_layer)
+        pass_in = tf.keras.layers.Dense(LSTM_size, activation="swish")(pass_in)
 
-        text_input_layer = tf.keras.layers.Input(shape=(text_transformer.max_sequence_length - 1,), name="Text Tokens Input")
-        text_embedding_layer = tf.keras.layers.Embedding(input_dim=text_transformer.vocab_size, output_dim=text_embedding_size)(text_input_layer)
-        text_embedding_layer = tf.keras.layers.Dropout(0.4)(text_embedding_layer)
-        text_embedding_forward = tf.keras.layers.LSTM(units=LSTM_size, return_sequences=False)(text_embedding_layer)
-        text_embedding_backward = tf.keras.layers.LSTM(units=LSTM_size, return_sequences=False, go_backwards=True)(text_embedding_layer)
-        text_embedding_layer = tf.keras.layers.Concatenate(axis=-1)([text_embedding_forward, text_embedding_backward])
-        text_embedding_layer = tf.keras.layers.Dense(image_embedding_size, activation="swish")(text_embedding_layer)
-        # text_embedding_layer = tf.keras.layers.Reshape(target_shape=(1, image_embedding_size))(text_embedding_layer)
+        text_input_layer = tf.keras.layers.Input(shape=(text_transformer.max_sequence_length - 1,),
+                                                 name="Text Tokens Input")
+        text_embedding_layer = tf.keras.layers.Embedding(input_dim=text_transformer.vocab_size,
+                                                         output_dim=text_embedding_size, mask_zero=True)(text_input_layer)
 
-        # attention = tf.keras.layers.Attention()([text_embedding_layer, image_pass_in])
-        # combined = tf.keras.layers.Add()([text_embedding_layer, image_pass_in])
-        combined = tf.keras.layers.Concatenate(axis=-1)([text_embedding_layer, image_pass_in])
-        combined = tf.keras.layers.Dense(image_embedding_size * 4, activation="swish")(combined)
-        output_layer = tf.keras.layers.Dense(text_transformer.vocab_size, activation="softmax")(combined)
-        # output_layer = tf.keras.layers.Reshape(target_shape=(text_transformer.vocab_size, ))(output_layer)
+        x1 = tf.keras.layers.LSTM(LSTM_size, return_sequences=True, recurrent_dropout=0.2, dropout=0.2)(text_embedding_layer)
+        x1 = tf.keras.layers.Add()([pass_in, x1])
+        x1 = tf.keras.layers.LSTM(LSTM_size, return_sequences=False, recurrent_dropout=0.2, dropout=0.2)(x1)
 
+        x2 = tf.keras.layers.LSTM(LSTM_size, return_sequences=True, go_backwards=True, recurrent_dropout=0.2, dropout=0.2)(text_embedding_layer)
+        x2 = tf.keras.layers.Add()([pass_in, x2])
+        x2 = tf.keras.layers.LSTM(LSTM_size, return_sequences=False, go_backwards=True, recurrent_dropout=0.2, dropout=0.2)(x2)
+
+        x = tf.keras.layers.Concatenate(axis=-1)([x1, x2])
+        x = tf.keras.layers.Dense(LSTM_size * 4, activation="swish")(x)
+        x = tf.keras.layers.Dense(LSTM_size * 4, activation="swish")(x)
+        output_layer = tf.keras.layers.Dense(text_transformer.vocab_size, activation="softmax")(x)
+
+        optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
         self.caption_model = tf.keras.models.Model(inputs=[image_input_layer, text_input_layer], outputs=output_layer)
-        self.caption_model.compile(optimizer="adam", loss="categorical_crossentropy")
+        self.caption_model.compile(optimizer=optimizer, loss="categorical_crossentropy")
 
     def summary(self):
         self.caption_model.summary()
@@ -236,7 +214,7 @@ class ImageCaptionModel:
     def train(self, train_loader: ImageCaptionSequence, validation_loader: ImageCaptionSequence, epochs: int):
         checkpoint = tf.keras.callbacks.ModelCheckpoint(self.model_file_path, save_weights_only=True,
                                                         save_best_only=True, verbose=1)
-        earlystopping = tf.keras.callbacks.EarlyStopping(patience=15, restore_best_weights=True)
+        earlystopping = tf.keras.callbacks.EarlyStopping(patience=10, restore_best_weights=True)
         history = self.caption_model.fit(train_loader, epochs=epochs,
                                          validation_data=validation_loader, callbacks=[checkpoint, earlystopping])
         self.is_loaded = True
@@ -248,7 +226,7 @@ class ImageCaptionModel:
         plt.ylabel('loss')
         plt.xlabel('epoch')
         plt.legend(['train', 'val'], loc='upper left')
-        plt.imsave("loss_plot.png")
+        plt.savefig("loss_plot.png")
         # plt.show()
 
     def load(self):

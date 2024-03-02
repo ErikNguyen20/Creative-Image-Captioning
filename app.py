@@ -1,8 +1,8 @@
 import os
-from flask import Flask, render_template, request, abort, redirect, url_for, flash
+from flask import Flask, render_template, session, request, abort, redirect, url_for, flash
 from flask_wtf import FlaskForm
-from flask_wtf.file import FileRequired, FileAllowed, FileField
-from wtforms import SubmitField, SelectField, TextAreaField
+from flask_wtf.file import FileRequired, FileField
+from wtforms import SubmitField, TextAreaField
 from wtforms.validators import InputRequired, ValidationError
 from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
@@ -65,9 +65,18 @@ def home():
         context = form.text_field.data
         filename = secure_filename(form.select_file.data.filename)
         form.select_file.data.save(os.path.join(app.config["UPLOAD_DIRECTORY"], filename))
+        session["filename"] = filename
 
-        return "File has been uploaded."
+        return redirect("/result")
     return render_template("home.html", form=form, flash_message=None)
+
+
+@app.route("/result")
+def result():
+    filename = session.get("filename", None)
+    if filename:
+        return f"{filename} has been uploaded!"
+        # filepath = os.path.join(app.config["UPLOAD_DIRECTORY"], filename)
 
 
 # Handles 404 error and returns a page html

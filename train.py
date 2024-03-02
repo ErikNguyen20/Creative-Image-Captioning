@@ -40,7 +40,7 @@ print(type(image_encoding))
 
 
 # Model Creation
-caption_generator = ImageCaptionModel(image_encoder, text_transformer)
+caption_generator = ImageCaptionModel(image_encoder, text_transformer, model_file_path="large_bilstm.h5")
 caption_generator.summary()
 
 # Training
@@ -56,10 +56,10 @@ test_captions = captions_df[captions_df["image"].isin(test_images)].groupby('ima
 train_loader = ImageCaptionSequence(train_captions, 64, image_encoder, text_transformer, cache="train_loader.pkl")
 test_loader = ImageCaptionSequence(test_captions, 64, image_encoder, text_transformer, cache="test_loader.pkl")
 
-caption_generator.train(train_loader, test_loader, 100)
+# caption_generator.train(train_loader, test_loader, 100)
 
 # Testing
-# caption_generator.load()
+caption_generator.load()
 result = caption_generator.predict("flickr8k/images/17273391_55cfc7d3d4.jpg")
 print(result)
 result = caption_generator.predict("flickr8k/images/19212715_20476497a3.jpg")
