@@ -27,6 +27,7 @@ captions_df["caption"] = captions_df["caption"].apply(lambda caption: re.sub(r"\
 
 # Tokenize Captions
 text_transformer = TextTransformer(captions_df["caption"].to_list(), 8000)
+text_transformer.save("text_transformer_saved.pkl")
 text_encoding = text_transformer.transform(["kid running in park"])
 print("Text Encoding Shape: ", text_encoding.shape)
 print(type(text_encoding))

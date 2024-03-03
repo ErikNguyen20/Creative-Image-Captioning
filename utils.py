@@ -1,3 +1,4 @@
+import json
 import os.path
 from typing import Optional, List, Dict, Union
 from nltk.translate.bleu_score import corpus_bleu
@@ -16,7 +17,6 @@ class ImageEncoder:
 
         self.interpolation = "bicubic"
         self.pretrained_model = tf.keras.applications.Xception(weights="imagenet")
-        self.pretrained_model.summary()
         self.image_size = tf.keras.backend.int_shape(self.pretrained_model.input)[1:3]
         self.encoding_model = tf.keras.models.Model(inputs=self.pretrained_model.input,
                                                     outputs=self.pretrained_model.layers[-2].output)
@@ -40,22 +40,40 @@ class ImageEncoder:
 
 
 class TextTransformer:
-    def __init__(self, captions: List[str], max_vocabulary_size: int, max_sequence_length: Optional[int] = None):
-        if max_sequence_length is None:
-            max_sequence_length = len(max(captions, key=lambda x: len(x.split())).split()) + 1
+    def __init__(self, captions: Union[List[str], str], max_vocabulary_size: int = 8000,
+                 max_sequence_length: Optional[int] = None):
+        # If the captions is a filepath
+        if isinstance(captions, str):
+            with open(captions, 'rb') as file:
+                loaded_data = pickle.load(file)
 
-        self.vectorize_model = tf.keras.layers.TextVectorization(
-            max_tokens=max_vocabulary_size,  # Set the maximum vocabulary size
-            output_mode='int',  # Output integers representing token indices
-            output_sequence_length=max_sequence_length,  # Set the maximum sequence length for padding
-            standardize=None
-        )
+            self.vectorize_model = tf.keras.layers.TextVectorization(
+                max_tokens=loaded_data['config']['max_tokens'],
+                output_mode=loaded_data['config']['output_mode'],
+                output_sequence_length=loaded_data['config']['output_sequence_length'])
+            self.vectorize_model.set_vocabulary(loaded_data['vocabulary'])
+            self.vectorize_model.set_weights(loaded_data['weights'])
 
-        # Adapt the TextVectorization layer to the captions
-        self.vectorize_model.adapt(captions)
+            self.max_sequence_length = loaded_data['config']['output_sequence_length']
+            self.vocab_size = loaded_data['config']['max_tokens']
+        else:
+            # If the captions is a list of strings
+            if max_sequence_length is None:
+                max_sequence_length = len(max(captions, key=lambda x: len(x.split())).split()) + 1
+
+            self.vectorize_model = tf.keras.layers.TextVectorization(
+                max_tokens=max_vocabulary_size,  # Set the maximum vocabulary size
+                output_mode='int',  # Output integers representing token indices
+                output_sequence_length=max_sequence_length,  # Set the maximum sequence length for padding
+                standardize=None
+            )
+
+            # Adapt the TextVectorization layer to the captions
+            self.vectorize_model.adapt(captions)
+            self.max_sequence_length = max_sequence_length
+            self.vocab_size = max_vocabulary_size
+
         self.vocabulary = self.vectorize_model.get_vocabulary()
-        self.max_sequence_length = max_sequence_length
-        self.vocab_size = max_vocabulary_size
 
     def transform(self, text: Union[List[str], str]):
         if type(text) is str:
@@ -73,6 +91,13 @@ class TextTransformer:
             return results
         else:
             return ' '.join([self.vocabulary[word] for word in embedding if word != 0])
+
+    def save(self, file_path: str):
+        with open(file_path, 'wb') as file:
+            pickle.dump(
+                {"weights": self.vectorize_model.get_weights(),
+                 "config": self.vectorize_model.get_config(),
+                 "vocabulary": self.vectorize_model.get_vocabulary()}, file)
 
 
 class ImageCaptionSequence(tf.keras.utils.Sequence):
@@ -275,3 +300,18 @@ class ImageCaptionModel:
         print("BLEU 2-gram: ", corpus_bleu(actual, predicted, weights=(0.5, 0.5, 0, 0)))
         print("BLEU 3-gram: ", corpus_bleu(actual, predicted, weights=(0.3, 0.3, 0.3, 0)))
         print("BLEU 4-gram: ", corpus_bleu(actual, predicted, weights=(0.25, 0.25, 0.25, 0.25)))
+
+
+class ImageCaptionPipline:
+    def __init__(self, text_transformer_file_path: str, model_file_path: str):
+        self.text_transformer = TextTransformer(text_transformer_file_path)
+        self.image_encoder = ImageEncoder()
+        self.caption_generator = ImageCaptionModel(self.image_encoder,
+                                                   self.text_transformer,
+                                                   model_file_path=model_file_path)
+        self.caption_generator.load()
+
+    def predict(self, image_path: str) -> str:
+        return self.caption_generator.predict(image_path)
+
+

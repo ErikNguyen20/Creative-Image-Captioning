@@ -7,6 +7,8 @@ from wtforms.validators import InputRequired, ValidationError
 from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
 
+from utils import ImageCaptionPipline
+
 # Example loading
 # https://github.com/devtonic-net/flask-loading-app-message-and-spinner/blob/main/main.py
 
@@ -14,10 +16,7 @@ from dotenv import load_dotenv
 # Instantiates Flask Application
 # Run the app by typing 'flask run' in the virtual environment terminal
 app = Flask(__name__)
-
-# Loads dot env variables
 load_dotenv()
-# Sets secret key for form validation (CSRF)
 app.config["SECRET_KEY"] = os.getenv("SECRET_KEY")
 
 # Configures file upload configurations
@@ -27,6 +26,9 @@ elif not os.path.exists(os.path.join("static", "uploads")):
     os.mkdir(os.path.join("static", "uploads"))
 app.config["UPLOAD_DIRECTORY"] = "static/uploads"
 app.config["MAX_UPLOAD_SIZE"] = 1048576  # 2 MB
+
+# Sets up model pipeline
+CaptionGenerator = ImageCaptionPipline("text_transformer_saved.pkl", "large_bilstm.h5")
 
 
 # Validates file upload type and size
@@ -43,12 +45,12 @@ def validate_file_upload(file_field):
         return f" File exceeds maximum size ({app.config['MAX_UPLOAD_SIZE']} bytes)."
     return None
 
+
 # Main page form
 class MainForm(FlaskForm):
     select_file = FileField("File", validators=[FileRequired()])
     text_field = TextAreaField("Creative Tuning")
     submit = SubmitField("Generate Caption")
-
 
 
 # Main Webpage
@@ -66,6 +68,7 @@ def home():
         filename = secure_filename(form.select_file.data.filename)
         form.select_file.data.save(os.path.join(app.config["UPLOAD_DIRECTORY"], filename))
         session["filename"] = filename
+        session["resulting_caption"] = CaptionGenerator.predict(os.path.join(app.config["UPLOAD_DIRECTORY"], filename))
 
         return redirect("/result")
     return render_template("home.html", form=form, flash_message=None)
@@ -74,8 +77,9 @@ def home():
 @app.route("/result")
 def result():
     filename = session.get("filename", None)
-    if filename:
-        return f"{filename} has been uploaded!"
+    resulting_caption = session.get("resulting_caption", None)
+    if filename and resulting_caption:
+        return f"Caption: {resulting_caption}."
         # filepath = os.path.join(app.config["UPLOAD_DIRECTORY"], filename)
 
 
