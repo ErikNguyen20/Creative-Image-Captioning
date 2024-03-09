@@ -1,4 +1,7 @@
 import os
+import time
+from datetime import datetime
+
 from flask import Flask, render_template, session, request, abort, redirect, url_for, flash
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileRequired, FileField
@@ -68,19 +71,32 @@ def home():
         filename = secure_filename(form.select_file.data.filename)
         form.select_file.data.save(os.path.join(app.config["UPLOAD_DIRECTORY"], filename))
         session["filename"] = filename
+        session['current_time'] = time.time()
         session["resulting_caption"] = CaptionGenerator.predict(os.path.join(app.config["UPLOAD_DIRECTORY"], filename))
 
         return redirect("/result")
     return render_template("home.html", form=form, flash_message=None)
 
 
+# Result Webpage
+# Displays the generated captions
 @app.route("/result")
 def result():
     filename = session.get("filename", None)
+    current_time = session.get("current_time", None)
     resulting_caption = session.get("resulting_caption", None)
     if filename and resulting_caption:
-        return f"Caption: {resulting_caption}."
-        # filepath = os.path.join(app.config["UPLOAD_DIRECTORY"], filename)
+        time_string = None
+        if current_time:
+            time_string = "Inference Time: {:.2f}s".format(time.time() - current_time)
+
+        captions_list = []
+        captions_list.append(resulting_caption + "1")
+        captions_list.append(resulting_caption + "2")
+        captions_list.append(resulting_caption + "3")
+
+        filepath = "uploads/" + filename
+        return render_template("result.html", image=filepath, captions=captions_list, time_string=time_string)
 
 
 # Handles 404 error and returns a page html

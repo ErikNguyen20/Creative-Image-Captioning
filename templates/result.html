@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<div class="text-center">
+    <h3 class="mb-4">Caption Results</h3>
+
+    {% if image %}
+        {% if time_string %}
+            <p>{{ time_string }}</p>
+        {% endif %}
+
+        <img class="img-fluid" src="{{ url_for('static', filename=image) }}" />
+
+    {% else %}
+        <h1>No image available</h1>
+    {% endif %}
+</div>
+
+<br>
+
+<h5>Generated Captions:</h5>
+
+{% for caption in captions %}
+    <div class="text-center">
+        <input class="form-control" type="text" value="{{ caption }}" aria-label="readonly input example" readonly>
+    </div>
+
+    <br>
+{% endfor %}
+
+{% endblock %}
