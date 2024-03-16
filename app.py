@@ -126,4 +126,4 @@ def page_not_found(err):
 # Runs the application. Alternatively it can be run by typing "flask run" in the terminal after activating the
 # virtual environment
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=False)

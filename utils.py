@@ -172,25 +172,6 @@ class ImageCaptionSequence(tf.keras.utils.Sequence):
         image_x_batch = np.array(image_x_batch)
         caption_y_batch = np.array(caption_y_batch)
 
-        # # image_x_batch = (batch_size, image_encoding_size)
-        # image_x_batch = np.array([self.image_encodings[image_ref] for image_ref in image_references[low:high]])
-        # image_x_batch = image_x_batch.squeeze(1)
-        #
-        # # caption_x_batch shape: (batch_size, max_tokens-1)
-        # caption_x_batch = np.array(
-        #     [self.caption_embeddings[image_ref][selected_caption_index, :-1]
-        #      for image_ref in image_references[low:high]]
-        # )
-        #
-        # # Caption output is shifted by 1 and one-hot-encoded
-        # # caption_y_batch shape: (batch_size, max_tokens-1, vocab_size)
-        # caption_y_batch = np.array(
-        #     [self.caption_embeddings[image_ref][selected_caption_index, 1:]
-        #      for image_ref in image_references[low:high]]
-        # )
-        # caption_y_batch = caption_y_batch.reshape(caption_y_batch.shape[0], caption_y_batch.shape[1], 1)
-        # caption_y_batch = tf.keras.utils.to_categorical(caption_y_batch, num_classes=self.vocabulary.vocab_size)
-
         return (image_x_batch, caption_x_batch), caption_y_batch
 
 
