@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<div class="text-center">
+    <h1 class="mb-4">Generating Captions...</h1>
+
+    <br>
+
+    <h3>This may take some time</h3>
+
+    <div class="d-flex justify-content-center">
+        <div class="spinner-border" role="status">
+            <span class="sr-only">Loading...</span>
+        </div>
+    </div>
+</div>
+
+<script> window.location.href = "{{ url_for('result') }}"; </script>
+
+{% endblock %}

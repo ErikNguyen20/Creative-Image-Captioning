@@ -2,6 +2,8 @@
 
 {% block content %}
 
+<a href="/" class="btn btn-primary hBack">Back</a>
+
 <div class="text-center">
     <h3 class="mb-4">Caption Results</h3>
 
@@ -14,6 +16,10 @@
 
     {% else %}
         <h1>No image available</h1>
+    {% endif %}
+
+    {% if context %}
+        <p>{{ context }}</p>
     {% endif %}
 </div>
 

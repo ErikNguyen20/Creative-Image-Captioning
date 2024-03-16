@@ -6,9 +6,12 @@ from nltk.translate.bleu_score import corpus_bleu
 import tensorflow as tf
 import matplotlib.pyplot as plt
 import pickle
+
+from openai import OpenAI
 from tqdm import tqdm
 import math
 import numpy as np
+from json import loads
 
 
 class ImageEncoder:
@@ -303,15 +306,47 @@ class ImageCaptionModel:
 
 
 class ImageCaptionPipline:
-    def __init__(self, text_transformer_file_path: str, model_file_path: str):
+    def __init__(self, text_transformer_file_path: str, model_file_path: str, system_prompt_file_path: str = "system_prompt.txt"):
         self.text_transformer = TextTransformer(text_transformer_file_path)
         self.image_encoder = ImageEncoder()
         self.caption_generator = ImageCaptionModel(self.image_encoder,
                                                    self.text_transformer,
                                                    model_file_path=model_file_path)
         self.caption_generator.load()
+        self.gpt_client = OpenAI()
 
-    def predict(self, image_path: str) -> str:
-        return self.caption_generator.predict(image_path)
+        self.system_prompt = None
+
+        # Read message from text file
+        with open(system_prompt_file_path, "r") as file:
+            self.system_prompt = file.read().strip()
+
+    def predict(self, image_path: str, context: str = None, options: int = 1) -> List[str]:
+        options = 5 if options > 5 else options
+
+        generated_caption = self.caption_generator.predict(image_path)
+        if options <= 1 or self.system_prompt is None:
+            return [self.caption_generator.predict(image_path)]
+        else:
+            context = context if context is not None else "None"
+            user_input = f"(Caption): {generated_caption}\n(Context): {context}\n(Num Caption Responses): {options}"
+
+            json_response = [generated_caption]
+            try:
+                response = self.gpt_client.chat.completions.create(
+                    model="gpt-3.5-turbo-0125",
+                    response_format={"type": "json_object"},
+                    messages=[
+                        {"role": "system", "content": self.system_prompt},
+                        {"role": "user", "content": user_input}
+                    ]
+                )
+                json_data = loads(response.choices[0].message.content)
+                json_response = json_data["captions"]
+            except Exception as e:
+                print("Error: ", e)
+
+            print(json_response, type(json_response))
+            return json_response
 
 

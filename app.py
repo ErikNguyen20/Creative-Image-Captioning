@@ -1,19 +1,15 @@
 import os
 import time
-from datetime import datetime
 
+import openai
 from flask import Flask, render_template, session, request, abort, redirect, url_for, flash
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileRequired, FileField
 from wtforms import SubmitField, TextAreaField
-from wtforms.validators import InputRequired, ValidationError
 from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
 
 from utils import ImageCaptionPipline
-
-# Example loading
-# https://github.com/devtonic-net/flask-loading-app-message-and-spinner/blob/main/main.py
 
 
 # Instantiates Flask Application
@@ -21,6 +17,7 @@ from utils import ImageCaptionPipline
 app = Flask(__name__)
 load_dotenv()
 app.config["SECRET_KEY"] = os.getenv("SECRET_KEY")
+
 
 # Configures file upload configurations
 if not os.path.exists("static"):
@@ -30,7 +27,11 @@ elif not os.path.exists(os.path.join("static", "uploads")):
 app.config["UPLOAD_DIRECTORY"] = "static/uploads"
 app.config["MAX_UPLOAD_SIZE"] = 1048576  # 2 MB
 
+
 # Sets up model pipeline
+print("~ Reminder that I have to pay for API usage ~")
+print("https://platform.openai.com/usage")
+openai.api_key = os.getenv("OPENAI_API_KEY")
 CaptionGenerator = ImageCaptionPipline("text_transformer_saved.pkl", "large_bilstm.h5")
 
 
@@ -47,6 +48,7 @@ def validate_file_upload(file_field):
     if file_size > app.config["MAX_UPLOAD_SIZE"]:
         return f" File exceeds maximum size ({app.config['MAX_UPLOAD_SIZE']} bytes)."
     return None
+
 
 
 # Main page form
@@ -71,11 +73,16 @@ def home():
         filename = secure_filename(form.select_file.data.filename)
         form.select_file.data.save(os.path.join(app.config["UPLOAD_DIRECTORY"], filename))
         session["filename"] = filename
-        session['current_time'] = time.time()
-        session["resulting_caption"] = CaptionGenerator.predict(os.path.join(app.config["UPLOAD_DIRECTORY"], filename))
+        session["context"] = context
 
-        return redirect("/result")
+        return redirect("/loading")
     return render_template("home.html", form=form, flash_message=None)
+
+
+# Loading page that is displayed to the user when the caption is generating
+@app.route("/loading", methods=["GET", "POST"])
+def loading():
+    return render_template("loading.html")
 
 
 # Result Webpage
@@ -83,20 +90,25 @@ def home():
 @app.route("/result")
 def result():
     filename = session.get("filename", None)
-    current_time = session.get("current_time", None)
-    resulting_caption = session.get("resulting_caption", None)
-    if filename and resulting_caption:
-        time_string = None
-        if current_time:
-            time_string = "Inference Time: {:.2f}s".format(time.time() - current_time)
+    context = session.get("context", None)
 
-        captions_list = []
-        captions_list.append(resulting_caption + "1")
-        captions_list.append(resulting_caption + "2")
-        captions_list.append(resulting_caption + "3")
+    if filename is None:
+        print("ERROR: Session File Name is Invalid!")
+        return redirect("/")
+    session.pop("filename")
+    session.pop("context")
+
+    # Times and generates the captions using the ML generation pipeline
+    current_time = time.time()
+    resulting_caption = CaptionGenerator.predict(os.path.join(app.config["UPLOAD_DIRECTORY"], filename), context, 3)
+    current_time = time.time() - current_time
+
+    if resulting_caption:
+        time_string = "Inference Time: {:.2f}s".format(current_time)
+        context = f"Context: {context}" if context else None
 
         filepath = "uploads/" + filename
-        return render_template("result.html", image=filepath, captions=captions_list, time_string=time_string)
+        return render_template("result.html", image=filepath, captions=resulting_caption, time_string=time_string, context=context)
 
 
 # Handles 404 error and returns a page html
