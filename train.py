@@ -5,11 +5,6 @@ from utils import TextTransformer, ImageEncoder, ImageCaptionSequence, ImageCapt
 
 # Flickr 30k dataset
 # https://www.kaggle.com/datasets/hsankesara/flickr-image-dataset
-# https://www.kaggle.com/code/ghazouanihaythem/image-captioninng-using-cnn-and-lstm
-# https://github.com/Hvass-Labs/TensorFlow-Tutorials/blob/master/22_Image_Captioning.ipynb
-
-# https://medium.com/swlh/image-captioning-using-attention-mechanism-f3d7fc96eb0e
-# https://github.com/ElisonSherton/Image_Captioning/blob/master/Keras_Greedy__Image_Captioning.ipynb
 
 
 # Import captions dataset

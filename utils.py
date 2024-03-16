@@ -1,4 +1,3 @@
-import json
 import os.path
 from typing import Optional, List, Dict, Union
 from nltk.translate.bleu_score import corpus_bleu
@@ -15,9 +14,14 @@ from json import loads
 
 
 class ImageEncoder:
+    """Converts images into feature embeddings.
+
+    :param image_directory: Directory path containing the images (Optional)
+    """
     def __init__(self, image_directory: Optional[str] = None):
         self.image_directory = image_directory
 
+        # Defines the image encoder (uses transfer learning)
         self.interpolation = "bicubic"
         self.pretrained_model = tf.keras.applications.Xception(weights="imagenet")
         self.image_size = tf.keras.backend.int_shape(self.pretrained_model.input)[1:3]
@@ -26,9 +30,16 @@ class ImageEncoder:
         self.output_size = tf.keras.backend.int_shape(self.pretrained_model.layers[-2].output)[1]
 
     def __call__(self, image_path: str, from_directory: bool = True):
+        """Converts the image found at the image_path into a feature embedding
+
+        :param image_path: File path for the image
+        :param from_directory: Necessary if you omit the directory path from the 'image_path' parameter
+        :returns embedding
+        """
         if self.image_directory and from_directory:
             image_path = os.path.join(self.image_directory, image_path)
 
+        # Scale and normalize image input
         image = tf.keras.utils.load_img(image_path, color_mode="rgb", target_size=self.image_size, interpolation=self.interpolation)
         image = tf.keras.utils.img_to_array(image)
         image = image / 255.0
@@ -43,6 +54,12 @@ class ImageEncoder:
 
 
 class TextTransformer:
+    """Converts text strings to vectors and back.
+
+    :param captions: A list of captions or a file path to a saved pkl TextTransformer
+    :param max_vocabulary_size: Maximum number of unique words in the vocabulary (Default = 8000)
+    :param max_sequence_length: Maximum number of words in a sentence (Default = None)
+    """
     def __init__(self, captions: Union[List[str], str], max_vocabulary_size: int = 8000,
                  max_sequence_length: Optional[int] = None):
         # If the captions is a filepath
@@ -79,14 +96,26 @@ class TextTransformer:
         self.vocabulary = self.vectorize_model.get_vocabulary()
 
     def transform(self, text: Union[List[str], str]):
+        """Converts text strings or a list of text strings into a vector
+
+        :param text: A list of strings or a singular text string
+        :returns vector
+        """
         if type(text) is str:
             return self.vectorize_model(np.array([text]))
         return self.vectorize_model(np.array(text))
 
     def inverse_transform(self, embedding: Union[tf.Tensor, int]) -> Union[str, List[str]]:
+        """Converts vector or list of vectors into their associated strings
+
+        :param embedding: A list of strings or a singular text string
+        :returns list of strings or singular string
+        """
+        # Single word
         if type(embedding) is int:
             return self.vocabulary[embedding]
 
+        # Sentence and/or list of sentences
         if tf.rank(embedding) == 2:
             results = []
             for sequence in embedding:
@@ -96,6 +125,10 @@ class TextTransformer:
             return ' '.join([self.vocabulary[word] for word in embedding if word != 0])
 
     def save(self, file_path: str):
+        """Saves the Text Transformer into a pkl file
+
+        :param file_path: Saved file path
+        """
         with open(file_path, 'wb') as file:
             pickle.dump(
                 {"weights": self.vectorize_model.get_weights(),
@@ -104,13 +137,16 @@ class TextTransformer:
 
 
 class ImageCaptionSequence(tf.keras.utils.Sequence):
+    """Container object used for batching when training the model
+
+    :param image_captions: key=file_reference, value=list_of_captions
+    :param batch_size: Size of the batch
+    :param image_encoder: Image Encoder Object
+    :param vocabulary: Text Transformer Object
+    :param cache: Desired file path for the pkl saved ImageCaptionSequence (Optional)
+    """
     def __init__(self, image_captions: Dict[str, List[str]], batch_size: int,
                  image_encoder: ImageEncoder, vocabulary: TextTransformer, cache: Optional[str] = None):
-        """
-        :param image_captions: key=file_reference, value=list_of_captions
-        :param batch_size:
-        :param image_encoder:
-        """
         self.batch_size = batch_size
         self.image_encoder = image_encoder
         self.vocabulary = vocabulary
@@ -118,7 +154,7 @@ class ImageCaptionSequence(tf.keras.utils.Sequence):
         self._min_captions_count = len(min(list(image_captions.values()), key=lambda x: len(x)))
         self.image_captions = image_captions
 
-        # Applies encoding transformation
+        # Applies encoding transformation. Caches it if specified
         if cache and os.path.exists(cache):
             print("Loaded Encoded Images from cache")
             with open(cache, 'rb') as file:
@@ -145,6 +181,26 @@ class ImageCaptionSequence(tf.keras.utils.Sequence):
         return math.ceil(len(self.image_encodings.keys()) / self.batch_size)
 
     def __getitem__(self, idx):
+        """Generates a batch
+            Caption X Format: Each sample predicts for the next word.
+            Therefore, there are several sub samples for each progressive word.
+            X1_2 = ["man running"]
+            X1_3 = ["man running from"] Y1_3 = "dog"
+            ...
+
+            Image X Format: Image Embedding. This is duplicated for every caption X subsample.
+            X1_1 = [0.321, 0.51, ...]
+            X1_2 = [0.321, 0.51, ...]
+            ...
+
+            Predicted Y Format: Next word from caption X subsample
+            Y1_2 = "from"
+            Y1_3 = "dog"
+            ...
+
+        Additionally, since there are multiple caption options per image in the dataset (5), each epoch will switch
+        between those ground-truth text captions for caption X/predicted Y in a round-robin fashion.
+        """
         image_references = list(self.image_encodings.keys())
         selected_caption_index = self._caption_iteration % self._min_captions_count
         low = idx * self.batch_size
@@ -176,6 +232,12 @@ class ImageCaptionSequence(tf.keras.utils.Sequence):
 
 
 class ImageCaptionModel:
+    """The Image Caption Deep Learning Model that is used to generate captions
+
+    :param image_encoder: Image Encoder Object
+    :param text_transformer: Text Transformer Object
+    :param model_file_path: Desired file path of the saved pkl model
+    """
     def __init__(self, image_encoder: ImageEncoder, text_transformer: TextTransformer,
                  model_file_path: str = "model.h5"):
         self.image_encoder = image_encoder
@@ -221,6 +283,12 @@ class ImageCaptionModel:
         self.caption_model.summary()
 
     def train(self, train_loader: ImageCaptionSequence, validation_loader: ImageCaptionSequence, epochs: int):
+        """Trains the model for image captioning.
+
+        :param train_loader: ImageCaptionSequence container with training data
+        :param validation_loader: ImageCaptionSequence container with validation data
+        :param epochs: Number of epochs to train for
+        """
         checkpoint = tf.keras.callbacks.ModelCheckpoint(self.model_file_path, save_weights_only=True,
                                                         save_best_only=True, verbose=1)
         earlystopping = tf.keras.callbacks.EarlyStopping(patience=10, restore_best_weights=True)
@@ -228,6 +296,7 @@ class ImageCaptionModel:
                                          validation_data=validation_loader, callbacks=[checkpoint, earlystopping])
         self.is_loaded = True
 
+        # Optionally plot the training losses
         plt.figure(figsize=(20, 8))
         plt.plot(history.history['loss'])
         plt.plot(history.history['val_loss'])
@@ -239,6 +308,8 @@ class ImageCaptionModel:
         # plt.show()
 
     def load(self):
+        """Loads the model from the saved pkl file
+        """
         if self.is_loaded:
             return
 
@@ -246,6 +317,12 @@ class ImageCaptionModel:
         self.is_loaded = True
 
     def predict(self, image_path: str, from_directory=False):
+        """Predicts the image captions using the image_path
+
+        :param image_path: File path of the image
+        :param from_directory: Necessary if you omit the directory path from the 'image_path' parameter
+        :returns Predicted text captions string
+        """
         if not self.is_loaded:
             print("Model not trained or loaded!")
             return None
@@ -253,6 +330,7 @@ class ImageCaptionModel:
         image_vector = self.image_encoder(image_path, from_directory=from_directory)
         caption_embedding = np.zeros(shape=(1, self.text_transformer.max_sequence_length - 1), dtype=np.int32)
 
+        # Iteratively predicts for each word
         token_count = 0
         current_token = ""
         output_caption = []
@@ -269,6 +347,10 @@ class ImageCaptionModel:
         return ' '.join(output_caption).strip()
 
     def evaluate_bleu_score(self, loader: ImageCaptionSequence):
+        """Evaluates the performance of the model using bleu score
+
+        :param loader: ImageCaptionSequence container with evaluation data
+        """
         actual = []
         predicted = []
 
@@ -287,6 +369,12 @@ class ImageCaptionModel:
 
 
 class ImageCaptionPipline:
+    """The Image Caption Pipeline that combines all the parts together for inference.
+
+    :param text_transformer_file_path: File path to saved TextTransformer pkl
+    :param model_file_path: File path to saved model pkl
+    :param system_prompt_file_path: Path to GPT system prompt text file
+    """
     def __init__(self, text_transformer_file_path: str, model_file_path: str, system_prompt_file_path: str = "system_prompt.txt"):
         self.text_transformer = TextTransformer(text_transformer_file_path)
         self.image_encoder = ImageEncoder()
@@ -303,6 +391,13 @@ class ImageCaptionPipline:
             self.system_prompt = file.read().strip()
 
     def predict(self, image_path: str, context: str = None, options: int = 1) -> List[str]:
+        """Predicts captions of an image and returns the resulting caption
+
+        :param image_path: File path of the image
+        :param context: Context used to pass into GPT-3 LLM for caption modification
+        :param options: Number of caption variations generated
+        :returns List of generated captions
+        """
         options = 5 if options > 5 else options
 
         generated_caption = self.caption_generator.predict(image_path)
@@ -312,6 +407,7 @@ class ImageCaptionPipline:
             context = context if context is not None else "None"
             user_input = f"(Caption): {generated_caption}\n(Context): {context}\n(Num Caption Responses): {options}"
 
+            # Interfaces with GPT-3 from OpenAI
             json_response = [generated_caption]
             try:
                 response = self.gpt_client.chat.completions.create(
