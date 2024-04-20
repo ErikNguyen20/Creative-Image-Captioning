@@ -7,6 +7,8 @@ venv/
 # Ignores serialized objects and models
 *.pkl
 *.h5
+!caption_model.h5
+!text_transformer_saved.pkl
 
 # Ignores raw image data
 flickr8k/images/*

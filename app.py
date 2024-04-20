@@ -12,6 +12,10 @@ from dotenv import load_dotenv
 from utils import ImageCaptionPipline
 
 
+# Google Drive Download
+# https://www.intodeeplearning.com/how-to-download-files-or-folders-in-gdrive-in-python/
+
+
 # Instantiates Flask Application
 # Run the app by typing 'flask run' in the virtual environment terminal
 app = Flask(__name__)
@@ -32,7 +36,7 @@ app.config["MAX_UPLOAD_SIZE"] = 1048576  # 2 MB
 print("~ Reminder that I have to pay for API usage ~")
 print("https://platform.openai.com/usage")
 openai.api_key = os.getenv("OPENAI_API_KEY")
-CaptionGenerator = ImageCaptionPipline("text_transformer_saved.pkl", "large_bilstm.h5")
+CaptionGenerator = ImageCaptionPipline("text_transformer_saved.pkl", "caption_model.h5")
 
 
 # Validates file upload type and size
