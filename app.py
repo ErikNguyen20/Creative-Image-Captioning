@@ -11,13 +11,13 @@ from dotenv import load_dotenv
 
 from utils import ImageCaptionPipline
 
+from pyngrok import ngrok
 
-# Google Drive Download
-# https://www.intodeeplearning.com/how-to-download-files-or-folders-in-gdrive-in-python/
 
 
 # Instantiates Flask Application
 # Run the app by typing 'flask run' in the virtual environment terminal
+PORT_NUMBER = 5000
 app = Flask(__name__)
 load_dotenv()
 app.config["SECRET_KEY"] = os.getenv("SECRET_KEY")
@@ -37,6 +37,15 @@ print("~ Reminder that I have to pay for API usage ~")
 print("https://platform.openai.com/usage")
 openai.api_key = os.getenv("OPENAI_API_KEY")
 CaptionGenerator = ImageCaptionPipline("text_transformer_saved.pkl", "caption_model.h5")
+
+
+# Sets up the grok public IP (optional)
+# https://dashboard.ngrok.com/get-started/your-authtoken
+grok_auth = os.getenv("GROK_AUTH", None)
+if grok_auth is not None:
+    ngrok.set_auth_token(grok_auth)
+    public_url = ngrok.connect(str(PORT_NUMBER)).public_url
+    print("Public URL: ", public_url)
 
 
 # Validates file upload type and size
@@ -130,4 +139,4 @@ def page_not_found(err):
 # Runs the application. Alternatively it can be run by typing "flask run" in the terminal after activating the
 # virtual environment
 if __name__ == "__main__":
-    app.run(debug=False)
+    app.run(debug=False, port=PORT_NUMBER)
