@@ -1,5 +1,5 @@
-# Senior Capstone Project
- CPSC 491
+# Creative Image Captioning
+ Generate Image Captions given an input image.
 
 ## Installation
 
