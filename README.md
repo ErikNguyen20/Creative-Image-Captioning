@@ -12,7 +12,7 @@ To get started with this web application, follow these steps:
    ```
    mkdir captioncrafterdir
    cd captioncrafterdir
-   git clone https://github.com/ErikNguyen20/Senior-Capstone-Project.git
+   https://github.com/ErikNguyen20/Creative-Image-Captioning.git
    ```
 
 3. Create and activate a Python virtual environment:
